@@ -1,7 +1,7 @@
 const express = require("express");
 const bodyParser = require("body-parser");
 const mongoose = require("mongoose");
-const logger = require('morgan');
+const morgan = require('morgan');
 const path = require('path');
 const routes = require("./routes");
 const app = express();
@@ -26,8 +26,10 @@ app.use(bodyParser.urlencoded({
   extended: false
 }));
 
-// set up logger
-app.use(logger('combined'));  
+// set up logger for any alarm
+app.use(morgan('combined',{
+  skip: function (req, res) { return res.statusCode < 400 }
+}));  
 
 // serve up static assets
  app.use(express.static(path.join(__dirname, "client/build")));
@@ -40,9 +42,9 @@ if (process.env.NODE_ENV === "production") {
 
 // Send every request to the React app
 // Define any API routes before this runs
-app.get("*", function(req, res) {
-  res.sendFile(path.join(__dirname, "./client/build/index.html"));
-});
+// app.get("*", function(req, res) {
+//   res.sendFile(path.join(__dirname, "./client/build/index.html"));
+// });
 
 // Start the API server
 const PORT = process.env.PORT || 5000;
