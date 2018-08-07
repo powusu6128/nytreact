@@ -1,193 +1,211 @@
+
 import React, { Component } from "react";
-import * as DeleteBtn from "../../components/DeleteBtn";
-import SaveBtn from "../../components/SavedBtn/SavedBtn";
-import Jumbotron from "../../components/Jumbotron";
 import API from "../../utils/API";
-import { Link } from "react-router-dom";
-import { Col, Row, Container } from "../../components/Grid";
-import { List, ListItem } from "../../components/List";
-import { Input, FormBtn } from "../../components/Form";
-import moment from "moment";
+import { Article } from '../../components/Article'
+import Jumbotron from "../../components/Jumbotron";
+import { H1, H3, H4 } from '../../components/Headings';
+import { Container, Row, Col } from "../../components/Grid";
+import { Panel, PanelHeading, PanelBody } from '../../components/Panel';
+import { Form, Input, FormBtn, FormGroup, Label } from "../../components/Form";
 
-class Article extends Component {
 
+export default class Articles extends Component {
   state = {
-    articles: [],
-    NYTResults: [],
-    topic: "",
-    from: "",
-    to: ""
+    topic: '',//main search term
+    sYear: '',//start year for search
+    eYear: '',//end year for search
+    page: '0',//page of search results
+    results: [],//array of results returned from api
+    previousSearch: {},//previous search term saved after search completed
+    noResults: false,//boolean used as flag for conditional rendering
   };
 
 
-  componentDidMount() {
-    this.loadArticles();
-    this.getOnlineNYTArticles("Trump", "20170101", "20180101");
-  }
-
-  getOnlineNYTArticles(topic, from, to){
-    var component = this;
-
-    API.getNYTArticles(topic, from, to)
-    .then((res) => {
-
-      if(res){
-    var data = [];
-      for (var i=0; i<(5>res.data.response.docs.length ? (res.data.response.docs.length) : 5); i++){
-      var url = res.data.response.docs[i].web_url;
-      var title = res.data.response.docs[i].headline.main;
-      var pub_date = res.data.response.docs[i].pub_date;
-      var id = res.data.response.docs[i]._id;
-      var newdata = {
-        _id: id,
-        title: title,
-        url: url,
-        pub_date: pub_date
-      }
-      data.push(newdata);
-      }
-      this.setState({NYTResults: data});
-      // console.log(data); 
+  //function to save an article
+  savedArticle = (article) => {
+    console.log("article from mongoos:"+JSON.stringify(article));
+    //creating new article object
+    let newArticle = {
+      date: article.pub_date,
+      title: article.headline.main,
+      url: article.web_url,
+      summary: article.snippet
     }
-  }); 
- ;
-  }
 
-  loadArticles(){
-    API.getArticles()
-    .then(res =>
-      this.setState({ articles: res.data, topic: "", from: "", to: ""})
-    )
-    .catch(err => console.log(err));
-  }
-
-  deleteArticle = id => {
-    API.deleteArticle(id)
-      .then(res => this.loadArticles())
-      .catch(err => console.log(err));
-  };
-
-  handleInputChange = event => {
-    const { name, value } = event.target;
-    this.setState({
-      [name]: value
-    });
-  };
-
-
-  createNewArticle = (title, url) => {
-    // console.log(url);
-    API.saveArticle({
-      title: title,
-      url: url,
-      date: Date.now()
-    })
-      .then(res => this.loadArticles())
+    //calling the API saved to mongoose
+    API
+      .saveArticle(newArticle)
+      .then(results => {
+        console.log("check result:"+results);
+        //removing the saved article from the results in state
+        let unsavedArticles = this.state.results.filter(article => article.headline.main !== newArticle.title)
+        this.setState({results: unsavedArticles})
+      })
       .catch(err => console.log(err));
   }
 
+  //capturing state of inputs on change
+  handleInputChange = (event) => {
+    let { name, value } = event.target;
+    this.setState({[name] : value})
+  };
 
-  handleSearchNYT = event => {
+  //generating the query for the search from stored state
+  handleFormSubmit = (event) => {
     event.preventDefault();
-    if (this.state.topic && this.state.from && this.state.to) {
-      // console.log(moment(this.state.from).format("YYYYMMDD"));
-      this.getOnlineNYTArticles(this.state.topic, moment(this.state.from).format("YYYYMMDD"), moment(this.state.to).format("YYYYMMDD"));
-    }
+    let { topic, sYear, eYear } = this.state;
+    let query = { topic, sYear, eYear }
+    this.getArticles(query)
+
   };
+
+  //function that queries the NYT API
+  getArticles = (query) => {
+    //clearing the results array if the user changes search terms
+    if (query.topic !== this.state.previousSearch.topic ||
+        query.eYear !==this.state.previousSearch.eYear ||
+        query.sYear !==this.state.previousSearch.sYear) {
+      this.setState({results: []})
+    }
+    let { topic, sYear, eYear } = query
+
+    let queryUrl = `https://api.nytimes.com/svc/search/v2/articlesearch.json?sort=newest&page=${this.state.page}`
+    let key = `&api-key=33c676fd7fd14e90a532f9698ab4dd4a`
+
+    //removing spaces and building the query url conditionally
+    //based on presence of optional search terms
+    if(topic.indexOf(' ')>=0){
+      topic = topic.replace(/\s/g, '+');
+    }
+    if (topic){
+      queryUrl+= `&fq=${topic}`
+    }
+    if(sYear){
+      queryUrl+= `&begin_date=${sYear}`
+    }
+    if(eYear){
+      queryUrl+= `&end_date=${eYear}`
+    }
+    queryUrl+=key;
+
+
+
+    //calling the API
+    API
+      .nytSendQuery(queryUrl)
+      .then(results => {
+        // console.log(results)
+          //concatenating new results to the current state of results.  If empty will just show results,
+          //but if search was done to get more, it shows all results.  Also stores current search terms
+          //for conditional above, and sets the noResults flag for conditional rendering of components below
+          this.setState({
+            results: [...this.state.results, ...results.data.response.docs],
+            previousSearch: query,
+            topic: '',
+            sYear: '',
+            eYear: ''
+          }, function (){
+            this.state.results.length === 0 ? this.setState({noResults: true}) : this.setState({noResults: false})
+          });
+      })
+      .catch(err=> console.log(err)
+  )
+  }
+
+  //function that is called when user clicks the get more results button
+  getMoreResults = () => {
+    let { topic, eYear, sYear} = this.state.previousSearch;
+    let query = { topic, eYear, sYear }
+    //increments page number for search and then runs query
+    let page = this.state.page;
+    page++
+    this.setState({page: page}, function (){
+      this.getArticles(query)
+    });
+  }
 
   render() {
     return (
       <Container fluid>
         <Row>
-          <Col size="md-12">
+          <Col size="sm-11" offset='sm-1'>
             <Jumbotron>
-              <h1>New York Times Article Scrubber</h1>
-              <p>Search for an annotate articles of interest!</p>
+              <H1 className='page-header text-center'>New York Times Article Searcher</H1>
+              <H4 className='text-center'>Search for and save articles of interest</H4>
             </Jumbotron>
-            <form>
-              {/* this part is the: Topic Input */}
-              <Input
-                value={this.state.topic}
-                onChange={this.handleInputChange}
-                name="topic"
-                placeholder="Topic"
-              />
-              {/* this part is the: From Input */}
-              <Input
-                value={this.state.from}
-                onChange={this.handleInputChange}
-                name="from"
-                placeholder="From Year"
-              />
-              {/* this part is the: To Input */}
-              <Input
-                value={this.state.to}
-                onChange={this.handleInputChange}
-                name="to"
-                placeholder="To Year"
-              />
-             
-              <FormBtn
-                disabled={!(this.state.topic && this.state.from && this.state.to)}
-                onClick={this.handleSearchNYT}
-              >
-                Search NYT
-              </FormBtn>
-            </form>
-          </Col>
-          </Row>
-          {/* {console.log(this.state.NYTResults)} */}
-          {this.state.NYTResults.length ? (
-          <Row>
-            <Col size="md-12 sm-12">
-            <p>5 Search Results:</p>
-            <List>
-            {this.state.NYTResults.map(article => (
-                  <ListItem key={article._id}>
-                    <Link to={article.url} target="_blank">
-                      <strong>
-                        {article.title} 
-                        <br />{article.url} 
-                        <br />Published at: {moment(article.pub_date).format("d/m/Y")}
-                      </strong>
-                    </Link>
-                    <SaveBtn onClick={() => this.createNewArticle(article.title, article.url)} />
-                  </ListItem>
-                ))}
-            </List>
-          </Col>
-          </Row>
-          ) : (
-            <p>Write a topic and from Year and To Year and click Search!</p>
-            )}
-          <Row>
-          <Col size="md-12 sm-12">
-            <Jumbotron>
-              <h1>Saved Articles</h1>
-            </Jumbotron>
-              {this.state.articles.length ? (
-              <List>
-                {this.state.articles.map(article => (
-                  <ListItem key={article._id}>
-                    <Link to={article.url} target="_blank">
-                      <strong>
-                        Title: {article.title} 
-                        <br/>Link: {article.url} 
-                        <br/>Saved at: {moment(article.date).format("d/m/Y")}
-                      </strong>
-                    </Link>
-                    <DeleteBtn onClick={() => this.deleteArticle(article._id)} />
-                  </ListItem>
-                ))}
-              </List>
-            ) : (
-              <h3>No Results to Display</h3>
-            )}
+            <Panel>
+              <PanelHeading>
+                <H3 style={{color: 'red'}}>Search</H3>
+              </PanelHeading>
+              <PanelBody>
+                <Form style={{marginBottom: '30px'}}>
+                  <FormGroup>
+                    <Label htmlFor="topic">Enter a topic to search for:</Label>
+                    <Input
+                      onChange={this.handleInputChange}
+                      name='topic'
+                      value={this.state.topic}
+                      placeholder='Search Topic'
+                    />
+                  </FormGroup>
+                  <FormGroup >
+                    <Label htmlFor="sYear">Enter a beginning date to search htmlFor (optional):</Label>
+                    <Input
+                      onChange={this.handleInputChange}
+                      type='date'
+                      name='sYear'
+                      value={this.state.sYear}
+                      placeholder='Start Year'
+                    />
+                  </FormGroup>
+                  <FormGroup >
+                    <Label htmlFor="eYear">Enter an end date to search for (optional):</Label>
+                    <Input
+                      onChange={this.handleInputChange}
+                      type='date'
+                      name='eYear'
+                      value={this.state.eYear}
+                      placeholder='End Year'
+                    />
+                  </FormGroup>
+                  <FormBtn
+                    disabled={!(this.state.topic)}
+                    onClick={this.handleFormSubmit}
+                    type='info'
+                    >Submit
+                  </FormBtn>
+                </Form>
+              </PanelBody>
+            </Panel>
+            { this.state.noResults ? (<H1>No results Found.  Please try again</H1>) :
+              this.state.results.length>0 ? (
+                <Panel>
+                  <PanelHeading>
+                    <H3>Result of search topic</H3>
+                  </PanelHeading>
+                  <PanelBody>
+                    {
+                      this.state.results.map((article, i) => (
+                          <Article
+                            key={i}
+                            title={article.headline.main}
+                            url={article.web_url}
+                            summary={article.snippet}
+                            date={article.pub_date}
+                            type='Save'
+                            onClick={() => this.savedArticle(article)}
+                          />
+                        )
+                      )
+                    }
+                      <FormBtn type='warning' additional='btn-block' onClick={this.getMoreResults}>Get more results</FormBtn>
+                  </PanelBody>
+                </Panel>
+              ) : ''
+            }
           </Col>
         </Row>
       </Container>
     );
   }
 }
-
-export default Article;

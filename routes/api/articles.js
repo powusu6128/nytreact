@@ -7,6 +7,9 @@ router.route("/")
   .get(articlesController.findAll)
   .post(articlesController.create);
 
+  router.route("/api/articles")
+  .get(articlesController.findAll)
+  .post(articlesController.create);
 // Matches with "/api/articles/:id"
 router
   .route("/:id")

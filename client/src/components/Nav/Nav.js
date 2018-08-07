@@ -1,11 +1,18 @@
 import React from "react";
+import { Link } from "react-router-dom";
 
-const Nav = () => (
-  <nav className="navbar navbar-expand-lg navbar-dark bg-primary">
-    <a className="navbar-brand" href="/">
-      React Reading List
-    </a>
-  </nav>
-);
+const Nav = () =>
+
+  <nav className="navbar navbar-dark bg-primary" style={{position: 'fixed', zIndex: 100, width: '100%'}}>
+    <Link className="navbar-brand" to="/">NYT Article Search</Link>
+      <ul className="navbar-nav" style={{float: 'right'}}>
+        <li className="nav-item">
+          <Link to="articles"><button type="button" className="btn btn-info" style={{marginRight:"10px"}}>Home</button></Link>
+        </li>
+        <li className="nav-item">
+          <Link to="/savedArticles"><button type="button" className="btn btn-info">Saved Articles</button></Link>
+        </li>
+      </ul>
+</nav>;
 
 export default Nav;
