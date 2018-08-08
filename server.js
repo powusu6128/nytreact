@@ -8,6 +8,7 @@ const app = express();
 
 //setting up the database connection
 const config = require('./config/databaseConnect');
+const PORT = process.env.PORT || 3001;
 
 mongoose.Promise = global.Promise;
 mongoose.connect(config.database)
@@ -17,14 +18,14 @@ mongoose.connect(config.database)
   .catch(err => console.log('There was an error with your connection:', err)
 );
 
-// set up routes
-app.use(routes);
-
 // configure body parser
 app.use(bodyParser.json());
 app.use(bodyParser.urlencoded({
   extended: false
 }));
+
+// set up routes
+app.use(routes);
 
 // set up logger for any alarm
 app.use(morgan('combined',{
@@ -39,15 +40,8 @@ if (process.env.NODE_ENV === "production") {
   app.use(express.static(path.join(__dirname,"client/build")));
 }
 
-
-// Send every request to the React app
-// Define any API routes before this runs
-// app.get("*", function(req, res) {
-//   res.sendFile(path.join(__dirname, "./client/build/index.html"));
-// });
-
 // Start the API server
-const PORT = process.env.PORT || 5000;
+
 app.listen(PORT, function () {
   console.log(`API Server now listening on PORT ${PORT}...`);
 });
