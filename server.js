@@ -8,7 +8,6 @@ const app = express();
 
 //setting up the database connection
 const config = require('./config/databaseConnect');
-const PORT = process.env.PORT || 3001;
 
 mongoose.Promise = global.Promise;
 mongoose.connect(config.database)
@@ -41,7 +40,7 @@ if (process.env.NODE_ENV === "production") {
 }
 
 // Start the API server
-
+const PORT = process.env.PORT || 3001;
 app.listen(PORT, function () {
   console.log(`API Server now listening on PORT ${PORT}...`);
 });
