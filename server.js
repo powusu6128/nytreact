@@ -23,8 +23,7 @@ app.use(bodyParser.urlencoded({
   extended: false
 }));
 
-// set up routes
-app.use(routes);
+
 
 // set up logger for any alarm
 app.use(morgan('combined',{
@@ -38,6 +37,9 @@ app.use(morgan('combined',{
 if (process.env.NODE_ENV === "production") {
   app.use(express.static(path.join(__dirname,"client/build")));
 }
+
+// set up routes
+app.use(routes);
 
 // Start the API server
 const PORT = process.env.PORT || 3001;
